@@ -4,8 +4,8 @@
 // stddef.h for MRNIU/SimpleKernel.
 
 
-#ifndef _STDDEF_H_
-#define _STDDEF_H_
+#ifndef _STDDEF_H
+#define _STDDEF_H
 
 #ifndef _PTRDIFF_T
 #define _PTRDIFF_T
@@ -19,7 +19,5 @@ typedef unsigned long size_t;
 
 #undef NULL
 #define NULL ((void *)0)
-
-#define UNUSED(x) (void)(x)
 
 #endif
