@@ -1,4 +1,3 @@
-
 # SimpleKernel
 
 ## 简介 Abstract
@@ -12,6 +11,8 @@ Loaded by GRUB.
 
 提供了各个阶段完成度不同的内核，你可以从自己喜欢的地方开始。
 Provides kernels with different degrees of completion in each stage, you can start from your favorite place.
+
+这个版本是只实现了输出的版本。
 
 ## 开发环境 Dependencies
 
@@ -58,29 +59,6 @@ Provides kernels with different degrees of completion in each stage, you can sta
 
     bochs 配置文件
 
-
-- bochsout.txt
-
-    bochs 输出
-    
-    
-## TODO
-
-对代码重新进行架构 -done
-
-gdt -done
-
-idt -done
-
-主要中断
-    键盘
-    鼠标
-
-调试函数 -done
-
-    
-
-    
 ## 参考资料 REFERENCES
 
 [交叉编译](https://wiki.osdev.org/GCC_Cross-Compiler)
@@ -102,5 +80,6 @@ idt -done
 [cfenollosa/os-tutorial](https://github.com/cfenollosa/os-tutorial)
 
 [omarrx024/xos](https://github.com/omarrx024/xos)
+
 
 
