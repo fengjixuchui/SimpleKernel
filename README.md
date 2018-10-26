@@ -59,27 +59,17 @@ Provides kernels with different degrees of completion in each stage, you can sta
     bochs 配置文件
 
 
-- bochsout.txt
+# 版本信息
 
-    bochs 输出
-    
-    
-## TODO
-
-对代码重新进行架构 -done
-
-gdt -done
-
-idt -done
-
-主要中断
-    键盘
-    鼠标
-
-调试函数 -done
-
-    
-
+- [x] Kernel init
+- [ ] interrupt
+- [ ] memory mangement
+- [ ] File system
+- [ ] Character device
+- [ ] block device
+- [ ] Network
+- [ ] Process management
+- [ ] etc.
     
 ## 参考资料 REFERENCES
 
