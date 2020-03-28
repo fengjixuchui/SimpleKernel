@@ -3,24 +3,25 @@
 //
 // debug.h for MRNIU/SimpleKernel.
 
-
 #ifndef _DEBUG_H_
 #define _DEBUG_H_
 
-#include "stdarg.h"
-#include "stddef.h"
-#include "stdio.h"
-#include "stdbool.h"
-#include "string.h"
-#include "multiboot2.h"
-#include "elf.h"
-#include "intr/intr.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void debug_init(uint32_t magic, uint32_t addr);
+#include "elf.h"
+
+#define DEBUG 1
+
+void debug_init(ptr_t magic, ptr_t addr);
 void print_cur_status(void);
-void panic(const char *msg);
-const char * elf_lookup_symbol(uint32_t addr, elf_t *elf);
+void panic(const char * msg);
+const char * elf_lookup_symbol(ptr_t addr, elf_t * elf);
 void print_stack_trace(void);
 
-
+#ifdef __cplusplus
+}
 #endif
+
+#endif /* _DEBUG_H_ */

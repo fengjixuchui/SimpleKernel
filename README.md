@@ -6,225 +6,93 @@
 [![996.icu](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
 [![HitCount](http://hits.dwyl.io/MRNIU/SimpleKernel.svg)](http://hits.dwyl.io/MRNIU/SimpleKernel)
 
-
 [English](https://github.com/MRNIU/SimpleKernel/blob/TODO/README_en.md) | [中文](https://github.com/MRNIU/SimpleKernel/blob/TODO/README.md)
 
 # SimpleKernel
 
 ## 关键词
 
-- Grub2
+- Kernel
+- C/C++
+
 - UXIN-like
-- 多任务
-- ELF
-- IDE disk
-- EXT2 文件系统
-- POSIX API
-- libc
-- 一些 shell命令
+- Multiboot2
 
 ## 简介
 
 SimpleKernel，一个用来练手的简单内核。提供了各个阶段完成度不同的内核，你可以从自己喜欢的地方开始。
 
-使用的语言：
-
-- x86 汇编
-
-- C
-
-- C++
-
-- Shell
-
-- make
-
-- x86
-
-
 ## 开发环境
 
 - Ubuntu Linux
 
-    - Bochs
-        编译安装
-
-    - i386-elf 交叉编译工具链
-        编译安装（./tools/）
-
+    - bochs
+    - i386-elf tool chain
+    i386-elf-binutils, i386-elf-gcc, i386-elf-grub
+    - xorriso
+    
 - Mac
-    - Bochs
 
-            brew install bochs
+    - Homebrew
 
-    - i386-elf 交叉编译工具链
+        https://brew.sh
 
-            brew install i386-elf-binutils
-            brew install i386-elf-gcc
-            cd SimpleKernel/ && brew install tools/i386-elf-grub.rb
+    - bochs
 
-注：
-Mac 10.14.1，bochs 2.6.9，i386-elf-binutils 2.31.1，i386-elf-gcc 8.2.0 测试通过。
+    - i386-elf tool chain
+
+        i386-elf-binutils, i386-elf-gcc, i386-elf-grub
+
+    - xorriso
+
+注：可以使用 setup.sh 自动安装环境
 
 ## 如何运行
 
-    git clone https://github.com/MRNIU/SimpleKernel.git
-    cd SimpleKernel/
-    sh setup.sh
-
-在出现的 bochs 命令行中 输入 `c` 即可运行。
+```shell
+git clone https://github.com/MRNIU/SimpleKernel.git
+cd SimpleKernel/
+sh setup.sh
+```
 
 运行截图
 
-![屏幕快照 2019-03-18 上午11.16.19](https://ws3.sinaimg.cn/large/006tKfTcly1g16s317uw8j316r0u0tkt.jpg)
+![](https://ws3.sinaimg.cn/large/006tKfTcly1g16s317uw8j316r0u0tkt.jpg)
 
-更多 bochs 使用方式请参考 bochs 的相关资料。
+## 目录结构
 
+- 原则
 
-## 快速上手
+    整个工程按照功能模块划分子目录，每个子目录再划分头文件和源文件目录，以便架构清晰、易懂。
 
-```
-├── LICENSE
-├── README.md
-├── README_en.md
-├── bochsrc.txt
-├── debug_info
-│   ├── bochsout.txt
-│   ├── diff.log
-│   ├── error.log
-│   └── normal.log
-├── docs
-│   └── README.md
-├── fs.img
-├── iso
-│   └── boot
-│       ├── grub
-│       │   └── grub.cfg
-│       └── kernel.kernel
-├── setup.sh
-├── simplekernel.img
-├── simplekernel.iso
-├── src
-│   ├── Makefile
-│   ├── READMD.md
-│   ├── arch
-│   │   ├── README.md
-│   │   ├── i386
-│   │   │   ├── README.md
-│   │   │   ├── boot
-│   │   │   │   ├── boot.o
-│   │   │   │   ├── boot.s
-│   │   │   │   └── link.ld
-│   │   │   ├── debug
-│   │   │   │   ├── debug.c
-│   │   │   │   └── debug.o
-│   │   │   ├── intr
-│   │   │   │   ├── README.md
-│   │   │   │   ├── intr.c
-│   │   │   │   ├── intr.h
-│   │   │   │   ├── intr.o
-│   │   │   │   ├── intr_s.o
-│   │   │   │   └── intr_s.s
-│   │   │   └── mm
-│   │   │       ├── README.md
-│   │   │       ├── gdt.c
-│   │   │       ├── gdt.h
-│   │   │       ├── gdt.o
-│   │   │       ├── gdt_s.o
-│   │   │       └── gdt_s.s
-│   │   └── x64
-│   │       └── TODO
-│   ├── include
-│   │   ├── README.md
-│   │   ├── console.hpp
-│   │   ├── cpu.hpp
-│   │   ├── debug.h
-│   │   ├── drv
-│   │   │   ├── keyboard.h
-│   │   │   └── mouse.h
-│   │   ├── ds_alg
-│   │   │   ├── LinkedList.c
-│   │   │   ├── LinkedList.o
-│   │   │   ├── alg.h
-│   │   │   └── datastructure.h
-│   │   ├── elf.h
-│   │   ├── fs
-│   │   ├── heap.c
-│   │   ├── heap.h
-│   │   ├── heap.o
-│   │   ├── intr
-│   │   │   ├── clock.c
-│   │   │   ├── clock.h
-│   │   │   └── clock.o
-│   │   ├── kernel.h
-│   │   ├── libc
-│   │   │   ├── README.md
-│   │   │   ├── assert.h
-│   │   │   ├── stdarg.h
-│   │   │   ├── stdbool.h
-│   │   │   ├── stddef.h
-│   │   │   ├── stdint.h
-│   │   │   ├── stdio
-│   │   │   │   ├── printk.c
-│   │   │   │   ├── printk.o
-│   │   │   │   ├── vsprintf.c
-│   │   │   │   └── vsprintf.o
-│   │   │   ├── stdio.h
-│   │   │   ├── stdlib.h
-│   │   │   ├── string
-│   │   │   │   ├── string.c
-│   │   │   │   └── string.o
-│   │   │   └── string.h
-│   │   ├── mm
-│   │   │   ├── README.md
-│   │   │   ├── mm.h
-│   │   │   ├── pmm.c
-│   │   │   ├── pmm.h
-│   │   │   ├── pmm.o
-│   │   │   ├── vmm.c
-│   │   │   ├── vmm.h
-│   │   │   └── vmm.o
-│   │   ├── multiboot2.h
-│   │   ├── pic.hpp
-│   │   ├── port.hpp
-│   │   ├── tty.hpp
-│   │   ├── vfs
-│   │   │   └── vfs.h
-│   │   └── vga.hpp
-│   ├── kernel
-│   │   ├── README.md
-│   │   ├── drv
-│   │   │   ├── keyboard.c
-│   │   │   ├── keyboard.o
-│   │   │   ├── mouse.c
-│   │   │   └── mouse.o
-│   │   ├── elf.c
-│   │   ├── elf.o
-│   │   ├── fs.c
-│   │   ├── fs.o
-│   │   ├── kernel.c
-│   │   ├── kernel.o
-│   │   ├── multiboot2.c
-│   │   ├── multiboot2.o
-│   │   ├── vfs.c
-│   │   └── vfs.o
-│   ├── kernel.kernel
-│   └── test
-│       ├── test.c
-│       ├── test.h
-│       └── test.o
-└── tools
-    ├── bochs.sh
-    ├── i386-elf-binutils.sh
-    ├── i386-elf-gcc.sh
-    └── i386-elf-grub.sh
-```
+### 目录设计
+- 原则
+
+    目录的命名能准确描述模块的基本功能，建议用小写字母且不含下划线、点等特殊符号；
+
+    目录必须放于相包含的父目录之下，并需要明确与其他目录间的耦合性。
+
+- 示例
+
+	kernel：系统内核部分；
+	libs：依赖库；
+
+### 依赖关系
+- 原则
+
+    新添加组件往往依赖于系统原有组件，必须以最小耦合的方式明确所直接依赖的组件。
+
+### 头文件
+
+#### 文件命名
+
+​	头文件命名能准确描述文件所包含的模块内容，达到通俗、易懂的目的。
+
+## Makefile
 
 ## 测试
 
-目前只有很简陋的 CI。
-
-### 自动化集成
+### 自动集成
 
 合并到 master 分支时需要通过 Travis CI 测试。编译没有错误即可。
 
@@ -237,7 +105,6 @@ simplekernel.img 是 1.44 软盘，我们的内核就在这里。
 ## TODO
 
 - 修复 bug
-- 鼠标输入处理
 - debug 函数
 - 添加编码规范测试
 - 并发
@@ -248,8 +115,6 @@ simplekernel.img 是 1.44 软盘，我们的内核就在这里。
 ## 贡献者
 
 [MRNIU](https://github.com/MRNIU)
-
-您也可以在贡献者名单中参看所有参与该项目的开发者。
 
 ## 贡献
 
@@ -291,8 +156,15 @@ simplekernel.img 是 1.44 软盘，我们的内核就在这里。
 
 [c-algorithms](https://github.com/fragglet/c-algorithms)
 
+## 支持作者
+
+请我喝杯咖啡吧！
+(ps: 请注明 GitHub id 以便加入捐献者名单
+
+<img src="https://tva1.sinaimg.cn/large/006tNbRwly1g9yjfoboa4j30go0p0411.jpg" width="30%" height="50%">
+
+<img src="https://tva1.sinaimg.cn/large/006tNbRwly1g9yjg7p0auj30u014qn7q.jpg" width="30%" height="50%">
+
 ## 版权信息
 
 此项目使用 MIT 许可证
-
-
