@@ -9,6 +9,7 @@ extern "C" {
 
 #include "stdio.h"
 #include "cpu.hpp"
+#include "sync.hpp"
 #include "mem/slab.h"
 #include "heap/heap.h"
 
@@ -16,22 +17,36 @@ static const heap_manage_t * heap_manager = &slab_manage;
 
 // 初始化堆
 void heap_init(void) {
-	cpu_cli();
-	heap_manager->heap_manage_init(HEAP_START);
-	cpu_sti();
+	bool intr_flag = false;
+	local_intr_store(intr_flag);
+	{
+		heap_manager->heap_manage_init(HEAP_START);
+		printk_info("heap_init\n");
+	}
+	local_intr_restore(intr_flag);
 	return;
 }
 
 // 内存申请
-ptr_t kmalloc(size_t len) {
-	ptr_t addr = 0;
-	addr = heap_manager->heap_manage_malloc(len);
+ptr_t kmalloc(size_t byte) {
+	ptr_t addr = (ptr_t)NULL;
+	bool intr_flag = false;
+	local_intr_store(intr_flag);
+	{
+		addr = heap_manager->heap_manage_malloc(byte);
+	}
+	local_intr_restore(intr_flag);
 	return addr;
 }
 
 // 内存释放
-void kfree(ptr_t p) {
-	heap_manager->heap_manage_free(p);
+void kfree(ptr_t addr) {
+	bool intr_flag = false;
+	local_intr_store(intr_flag);
+	{
+		heap_manager->heap_manage_free(addr);
+	}
+	local_intr_restore(intr_flag);
 	return;
 }
 

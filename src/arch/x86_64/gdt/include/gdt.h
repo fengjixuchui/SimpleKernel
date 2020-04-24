@@ -75,8 +75,9 @@ typedef
 
 // TSS(任务状态段) 描述符
 // TSS的使用是为了解决调用门中特权级变换时堆栈发生的变化.
+// 资料：intel 手册 3ACh7
 typedef
-    struct tss_entry_t {
+    struct tss_struct {
 	uint32_t	ts_link;  // old ts selector
 	uint32_t	ts_esp0;  // stack pointers and segment selectors
 	uint32_t	ts_ss0;  // after an increase in privilege level
@@ -104,12 +105,13 @@ typedef
 	uint32_t	ts_ldt;
 	uint32_t	ts_t;  // trap on task switch
 	uint32_t	ts_iomb;  // i/o map base address
-} __attribute__( (packed) ) tss_entry_t;
+} __attribute__( (packed) ) tss_struct_t;
 
 // 全局描述符表构造函数，根据下标构造
 // 参数: num-数组下标、base-基地址、limit-限长、access-访问标志，gran-粒度
 void gdt_set_gate(int32_t num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran);
-
+void tss_set_gate(int32_t num, uint16_t ss0, uint32_t esp0);
+extern tss_struct_t tss_entry __attribute__( (aligned(8) ) );
 // 加载 GDTR
 extern void gdt_load(uint32_t);
 // 刷新 TSS

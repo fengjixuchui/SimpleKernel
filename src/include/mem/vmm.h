@@ -98,10 +98,13 @@ void unmap(pgd_t * pgd_now, ptr_t va);
 
 // 如果虚拟地址 va 映射到物理地址则返回 1
 // 同时如果 pa 不是空指针则把物理地址写入 pa 参数
-uint32_t get_mapping(pgd_t * pgd_now, ptr_t va, ptr_t pa);
+uint32_t get_mapping(pgd_t * pgd_now, ptr_t va, ptr_t * pa);
 
 // 更换当前页目录
 void switch_pgd(ptr_t pd);
+
+// 初始化内核页目录
+void vmm_kernel_init(pgd_t * pgd);
 
 #define VMM_LA_PA(la) (la - KERNEL_BASE)
 #define VMM_PA_LA(pa) (pa + KERNEL_BASE)

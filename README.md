@@ -26,11 +26,13 @@ SimpleKernel，一个用来练手的简单内核。提供了各个阶段完成�
 
 - Ubuntu Linux
 
+    注意：未测试
+
     - bochs
     - i386-elf tool chain
     i386-elf-binutils, i386-elf-gcc, i386-elf-grub
     - xorriso
-    
+
 - Mac
 
     - Homebrew
@@ -39,9 +41,9 @@ SimpleKernel，一个用来练手的简单内核。提供了各个阶段完成�
 
     - bochs
 
-    - i386-elf tool chain
+    - x86_64-elf tool chain
 
-        i386-elf-binutils, i386-elf-gcc, i386-elf-grub
+        x86_64-elf-binutils, x86_64-elf-gcc, x86_64-elf-grub
 
     - xorriso
 
@@ -57,7 +59,7 @@ sh setup.sh
 
 运行截图
 
-![](https://ws3.sinaimg.cn/large/006tKfTcly1g16s317uw8j316r0u0tkt.jpg)
+![](https://tva1.sinaimg.cn/large/00831rSTly1gdl6j8bxw7j317s0u0td9.jpg)
 
 ## 目录结构
 
@@ -86,7 +88,7 @@ sh setup.sh
 
 #### 文件命名
 
-​	头文件命名能准确描述文件所包含的模块内容，达到通俗、易懂的目的。
+头文件命名能准确描述文件所包含的模块内容，达到通俗、易懂的目的。
 
 ## Makefile
 
@@ -104,13 +106,9 @@ simplekernel.img 是 1.44 软盘，我们的内核就在这里。
 
 ## TODO
 
-- 修复 bug
-- debug 函数
-- 添加编码规范测试
 - 并发
 - 文件系统
 - 设备驱动
-- 虚拟内存管理
 
 ## 贡献者
 
@@ -155,6 +153,16 @@ simplekernel.img 是 1.44 软盘，我们的内核就在这里。
 [DNKernel](https://github.com/morimolymoly/DNKernel)
 
 [c-algorithms](https://github.com/fragglet/c-algorithms)
+
+[Linux内核中的中断栈与内核栈的补充说明](http://blog.chinaunix.net/uid-23769728-id-3077874.html)
+
+[Linux进程管理 (1)进程的诞生](https://www.cnblogs.com/arnoldlu/p/8466928.html)
+
+## 捐助者
+
+- [digmouse233](https://github.com/digmouse233)
+
+- l*e
 
 ## 支持作者
 

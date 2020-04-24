@@ -9,6 +9,7 @@ extern "C" {
 
 #include "stdio.h"
 #include "string.h"
+#include "assert.h"
 #include "mem/pmm.h"
 #include "mem/vmm.h"
 #include "mem/slab.h"
@@ -21,9 +22,8 @@ extern "C" {
 // 最小空间
 #define SLAB_MIN (0xFF)
 
-// static void init(ptr_t addr_start);
-void init(ptr_t addr_start);
-static ptr_t alloc(uint32_t bytes);
+static void init(ptr_t addr_start);
+static ptr_t alloc(size_t byte);
 static void free(ptr_t addr);
 
 heap_manage_t slab_manage = {
@@ -36,9 +36,9 @@ heap_manage_t slab_manage = {
 typedef
     struct slab_block {
 	// 该内存块是否已经被申请
-	uint32_t	allocated;
+	size_t		allocated;
 	// 当前内存块的长度，不包括头长度
-	uint32_t	len;
+	size_t		len;
 } slab_block_t;
 
 // 一个仅在这里使用的简单循环链表
@@ -53,20 +53,25 @@ typedef
 typedef
     struct slab_manage {
 	// 管理的内存起始地址，包括头的位置
-	ptr_t			addr_start;
+	ptr_t		addr_start;
 	// 管理的内存结束地址
-	ptr_t			addr_end;
+	ptr_t		addr_end;
 	// 物理内存的总大小，包括头的大小
-	uint32_t		mm_total;
+	size_t		mm_total;
 	// 当前空闲内存大小
-	uint32_t		mm_free;
+	size_t		mm_free;
 	// 当前存在的内存数量
-	uint32_t		block_count;
+	size_t		block_count;
 	// 内存头链表
-	list_entry_t *		slab_list;
+	list_entry_t * slab_list;
 } slab_manage_t;
 
-static inline void list_init_head(list_entry_t * list);
+// 管理信息
+static slab_manage_t sb_manage;
+static list_entry_t * sb_list = NULL;
+
+// 初始化节点
+static inline void list_init(list_entry_t * list);
 
 // 在中间添加元素
 static inline void list_add_middle(list_entry_t * prev,  list_entry_t * next, list_entry_t * new);
@@ -90,7 +95,7 @@ static inline list_entry_t * list_next(list_entry_t * list);
 static inline slab_block_t * list_slab_block(list_entry_t * list);
 
 // 初始化
-void list_init_head(list_entry_t * list) {
+void list_init(list_entry_t * list) {
 	list->next = list;
 	list->prev = list;
 	return;
@@ -138,9 +143,24 @@ slab_block_t * list_slab_block(list_entry_t * list) {
 	return &(list->slab_block);
 }
 
-// 管理信息
-static slab_manage_t sb_manage;
-static list_entry_t * sb_list = NULL;
+static inline void set_used(list_entry_t * entry);
+static inline void set_unused(list_entry_t * entry);
+
+// 将 entry 设置为已使用
+static inline void set_used(list_entry_t * entry) {
+	list_slab_block(entry)->allocated = SLAB_USED;
+	sb_manage.mm_free -= sizeof(list_entry_t);
+	sb_manage.mm_free -= list_slab_block(entry)->len;
+	return;
+}
+
+// 将 entry 设置为未使用
+static inline void set_unused(list_entry_t * entry) {
+	list_slab_block(entry)->allocated = SLAB_UNUSED;
+	sb_manage.mm_free -= sizeof(list_entry_t);
+	sb_manage.mm_free += list_slab_block(entry)->len;
+	return;
+}
 
 void init(ptr_t addr_start) {
 	// 设置第一块内存的信息
@@ -156,37 +176,38 @@ void init(ptr_t addr_start) {
 	sb_manage.addr_start = addr_start;
 	sb_manage.addr_end = addr_start + VMM_PAGE_SIZE;
 	sb_manage.mm_total = VMM_PAGE_SIZE;
-	sb_manage.mm_free = VMM_PAGE_SIZE - sizeof(list_entry_t);
+	sb_manage.mm_free = 0;
 	sb_manage.block_count = 1;
 	sb_manage.slab_list = sb_list;
-	list_init_head(sb_manage.slab_list);
+	list_init(sb_manage.slab_list);
 	// 设置第一块内存的相关信息
 	list_slab_block(sb_manage.slab_list)->allocated = SLAB_UNUSED;
 	list_slab_block(sb_manage.slab_list)->len = VMM_PAGE_SIZE - sizeof(list_entry_t);
 	return;
 }
 
-static inline void slab_split(list_entry_t * list, uint32_t len);
+static inline list_entry_t * slab_split(list_entry_t * list, size_t byte);
 static inline void slab_merge(list_entry_t * list);
 
-// 切分内存块，len 为 list 的总大小（包括头大小）
-void slab_split(list_entry_t * list, uint32_t len) {
+// 切分内存块，len 为调用者申请的大小，不包括头大小
+// 返回分割出来的管理头地址
+list_entry_t * slab_split(list_entry_t * entry, size_t len) {
 	// 如果剩余内存大于内存头的长度+设定的最小长度
-	if(list_slab_block(list)->len - len > sizeof(list_entry_t) + SLAB_MIN) {
+	if( (list_slab_block(entry)->len - len > sizeof(list_entry_t) + SLAB_MIN) ) {
 		// 添加新的链表项，位于旧表项开始地址+旧表项长度
-		list_entry_t * new_list = (list_entry_t *)( (ptr_t)list + len);
-		new_list->next = new_list;
-		new_list->prev = new_list;
-		list_slab_block(new_list)->allocated = SLAB_UNUSED;
-		// 新表项的长度为：list->len（申请的大小）- 需要的大小 - 头大小
-		list_slab_block(new_list)->len = list_slab_block(list)->len - len - sizeof(list_entry_t);
-		sb_manage.mm_free += list_slab_block(new_list)->len;
+		list_entry_t * new_entry = (list_entry_t *)( (ptr_t)entry + sizeof(list_entry_t) + len);
+		bzero( (void *)new_entry, list_slab_block(entry)->len - len);
+		list_init(new_entry);
+		// 新表项的长度为：list->len（总大小）- 头大小 - 要求分割的大小
+		list_slab_block(new_entry)->len = list_slab_block(entry)->len - len - sizeof(list_entry_t);
+		set_unused(new_entry);
 		sb_manage.block_count += 1;
-		list_add_after(list, new_list);
+		list_add_after(entry, new_entry);
 		// 重新设置旧链表信息
-		list_slab_block(list)->len = len;
+		list_slab_block(entry)->len = len;
+		return new_entry;
 	}
-	return;
+	return (list_entry_t *)NULL;
 }
 
 // 合并内存块
@@ -209,54 +230,97 @@ void slab_merge(list_entry_t * list) {
 	return;
 }
 
-ptr_t alloc(uint32_t bytes) {
-	// 所有申请的内存长度(限制最小大小)加上管理头的长度
-	uint32_t len = (bytes > SLAB_MIN) ? bytes : SLAB_MIN;
-	len += sizeof(list_entry_t);
+// 寻找符合要求的内存块，未找到返回 NULL
+static inline list_entry_t * find_entry(size_t len);
+list_entry_t * find_entry(size_t len) {
 	list_entry_t * entry = sb_manage.slab_list;
-	while(entry->next != sb_manage.slab_list) {
-		// 查找符合长度且未使用的内存
-		if( (list_slab_block(entry)->len >= len) && (list_slab_block(entry)->allocated == SLAB_UNUSED) ) {
+	do {
+		// 查找符合长度且未使用，符合对齐要求的内存
+		if( (list_slab_block(entry)->len >= len)
+		    && (list_slab_block(entry)->allocated == SLAB_UNUSED) ) {
 			// 进行分割，这个函数会同时设置 entry 的信息
 			slab_split(entry, len);
-			list_slab_block(entry)->allocated = SLAB_USED;
-			sb_manage.mm_free -= list_slab_block(entry)->len;
-			return (ptr_t)( (ptr_t)entry + sizeof(list_entry_t) );
+			return entry;
 		}
 		// 没找到的话就查找下一个
-		entry = list_next(entry);
-	}
-	// 如果执行到这里，说明没有可用空间了，那么申请新的内存页
-	// 注意：第一次执行 alloc 函数的时候会直接跳到这里，造成第一页内存无法分配，下次调用就ok了
-	list_entry_t * new_entry;
-	ptr_t pa = pmm_alloc(len);
+		else {
+			entry = list_next(entry);
+		}
+	} while(list_next(entry) != sb_manage.slab_list);
+	return (list_entry_t *)NULL;
+}
+
+// 申请新的内存页
+// 参数分别为：虚拟地址起点，要申请的页数
+static inline ptr_t alloc_page(ptr_t va, size_t page);
+ptr_t alloc_page(ptr_t va, size_t page) {
+	ptr_t pa = pmm_alloc(page * VMM_PAGE_SIZE);
 	if(pa == (ptr_t)NULL) {
-		printk_err("Error at slab.c ptr_t alloc(): no enough physical memory\n");
+		printk_err("Error at slab.c ptr_t alloc_page(): no enough physical memory\n");
 		return (ptr_t)NULL;
 	}
-	ptr_t va = (ptr_t)( (ptr_t)entry + list_slab_block(entry)->len + sizeof(list_entry_t) );
-	uint32_t pages = len / VMM_PAGE_SIZE;
-	if(len % VMM_PAGE_SIZE != 0) {
-		pages += 1;
-	}
-	for(uint32_t va_start = va, pa_start = pa ;
-	    pa_start < pa + VMM_PAGE_SIZE * pages ;
+	for(ptr_t va_start = va, pa_start = pa ;
+	    pa_start < pa + VMM_PAGE_SIZE * page ;
 	    pa_start += VMM_PAGE_SIZE, va_start += VMM_PAGE_SIZE) {
-		map(pgd_kernel, va_start, pa_start, VMM_PAGE_PRESENT | VMM_PAGE_RW);
+		// 如果当前线性地址没有映射
+		if(get_mapping(pgd_kernel, va_start, (ptr_t *)NULL) == 0) {
+			map(pgd_kernel, va_start, pa_start, VMM_PAGE_PRESENT | VMM_PAGE_RW);
+		}
+		else {
+			// 如果有部分映射了，则全部 unmap
+			ptr_t addr = (ptr_t)NULL;
+			for(addr = va ; addr < va_start ; addr += VMM_PAGE_SIZE) {
+				unmap(pgd_kernel, addr);
+			}
+			// 并重新计算 va 的值
+			// 运行到这里时 addr 尚未被检测，所以下面的代码从 addr 开始
+			// 计算方法：addr~addr+page*VMM_PAGE_SIZE 的 get_mapping 结果全部为 0
+			ptr_t tmp = addr;
+			while(addr < tmp + page * VMM_PAGE_SIZE) {
+				// 如果遇到映射过的
+				if(get_mapping(pgd_kernel, addr, (ptr_t *)NULL) != 0) {
+					// 更新 addr 地址
+					addr += VMM_PAGE_SIZE;
+					tmp = addr;
+				}
+				addr += VMM_PAGE_SIZE;
+			}
+			// 这时 addr 就是符合要求的地址
+			// 全部映射即可
+			map(pgd_kernel, addr, pa_start, VMM_PAGE_PRESENT | VMM_PAGE_RW);
+			return addr;
+		}
 	}
+	bzero( (void *)va, VMM_PAGE_SIZE * page);
+	return va;
+}
 
+ptr_t alloc(size_t byte) {
+	// 所有申请的内存长度(限制最小大小)加上管理头的长度
+	size_t len = (byte > SLAB_MIN) ? byte : SLAB_MIN;
+	list_entry_t * entry = find_entry(len);
+	if(entry != NULL) {
+		set_used(entry);
+		return (ptr_t)( (ptr_t)entry + sizeof(list_entry_t) );
+	}
+	entry = list_prev(sb_manage.slab_list);
+	// 如果执行到这里，说明没有可用空间了，那么申请新的内存页
+	list_entry_t * new_entry;
+	len += sizeof(list_entry_t);
+	size_t pages = (len % VMM_PAGE_SIZE == 0) ? (len / VMM_PAGE_SIZE) : ( (len / VMM_PAGE_SIZE) + 1);
+	ptr_t va = alloc_page( (ptr_t)( (ptr_t)entry + sizeof(list_entry_t) + list_slab_block(entry)->len), pages);
+	if(va == (ptr_t)NULL) {
+		printk_err("Error at slab.c ptr_t alloc_align(): no enough physical memory\n");
+		return (ptr_t)NULL;
+	}
 	new_entry = (list_entry_t *)va;
-	new_entry->next = new_entry;
-	new_entry->prev = new_entry;
-	sb_manage.block_count += 1;
-	list_slab_block(new_entry)->allocated = SLAB_USED;
+	list_init(new_entry);
 	// 新表项的可用长度为减去头的大小
 	list_slab_block(new_entry)->len = (ptr_t)(pages * VMM_PAGE_SIZE) - sizeof(list_entry_t);
-
+	list_add_after(entry, new_entry);
 	// 进行分割
 	slab_split(new_entry, len);
-	sb_manage.mm_free -= list_slab_block(new_entry)->len;
-	list_add_after(entry, new_entry);
+	set_used(new_entry);
 	return (ptr_t)( (ptr_t)new_entry + sizeof(list_entry_t) );
 }
 

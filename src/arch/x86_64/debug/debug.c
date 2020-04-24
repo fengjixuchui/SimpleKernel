@@ -7,17 +7,19 @@
 extern "C" {
 #endif
 
-#include "stddef.h"
 #include "stdio.h"
 #include "intr/include/intr.h"
 #include "cpu.hpp"
+#include "sync.hpp"
 #include "debug.h"
 
-void debug_init(ptr_t magic UNUSED, ptr_t addr UNUSED) {
-	cpu_cli();
-	printk_debug("debug_init\n");
-	// multiboot2_init(magic, addr);
-	cpu_sti();
+void debug_init(ptr_t magic __UNUSED__, ptr_t addr __UNUSED__) {
+	bool intr_flag = false;
+	local_intr_store(intr_flag);
+	{
+		printk_debug("debug_init\n");
+	}
+	local_intr_restore(intr_flag);
 	return;
 }
 
@@ -77,6 +79,15 @@ void print_stack_trace(void) {
 		printk("   [0x%x] %s\n", *eip, elf_lookup_symbol(*eip, &kernel_elf) );
 		ebp = (uint32_t *)*ebp;
 	}
+}
+
+// 输出 esp
+void print_stack(size_t count) {
+	register ptr_t * esp __asm__ ("esp");
+	for(size_t i = 0 ; i < count ; i++) {
+		printk_debug("esp 0x%08X [0x%08X]\n", esp + i, *(esp + i) );
+	}
+	return;
 }
 
 #ifdef __cplusplus

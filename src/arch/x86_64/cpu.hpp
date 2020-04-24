@@ -111,7 +111,7 @@ static inline void cpu_hlt(void) {
 
 // 开启中断
 static inline void cpu_sti(void) {
-	__asm__ volatile ("sti");
+	__asm__ volatile ("sti" ::: "memory");
 	return;
 }
 
@@ -154,6 +154,14 @@ static inline uint32_t cpu_read_cr3(void) {
 	__asm__ volatile ("mov %%cr3, %0" : "=b" (cr3) );
 	return cr3;
 }
+
+// 切换内核栈
+static inline void cpu_switch_stack(ptr_t stack_top) {
+	__asm__ volatile ("mov %0, %%esp" : : "r" (stack_top) );
+	__asm__ volatile ("xor %%ebp, %%ebp" : :);
+	return;
+}
+
 
 // 读取 CR4
 static inline uint32_t cpu_read_cr4(void) {

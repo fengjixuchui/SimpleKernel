@@ -10,6 +10,7 @@ extern "C" {
 #include "stdio.h"
 #include "debug.h"
 #include "cpu.hpp"
+#include "sync.hpp"
 #include "include/gdt.h"
 
 static gdt_ptr_t gdt_ptr;
@@ -17,8 +18,7 @@ static gdt_ptr_t gdt_ptr;
 static gdt_entry_t gdt_entries[GDT_LENGTH] __attribute__( (aligned(8) ) );
 
 // TSS 段定义
-static tss_entry_t tss_entry __attribute__( (aligned(8) ) );
-static void tss_set_gate(int32_t num, uint16_t ss0, uint32_t esp0);
+tss_struct_t tss_entry __attribute__( (aligned(8) ) );
 
 void gdt_set_gate(int32_t num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran) {
 	gdt_entries[num].base_low     = (base & 0xFFFF);
@@ -30,6 +30,7 @@ void gdt_set_gate(int32_t num, uint32_t base, uint32_t limit, uint8_t access, ui
 
 	gdt_entries[num].granularity |= gran & 0xF0;
 	gdt_entries[num].access       = access;
+	return;
 }
 
 void tss_set_gate(int32_t num, uint16_t ss0, uint32_t esp0) {
@@ -49,31 +50,35 @@ void tss_set_gate(int32_t num, uint16_t ss0, uint32_t esp0) {
 	tss_entry.ts_es = USER_DS;
 	tss_entry.ts_fs = USER_DS;
 	tss_entry.ts_gs = USER_DS;
+	return;
 }
 
 // 初始化全局描述符表
 void gdt_init(void) {
-	cpu_cli();
-	// 全局描述符表界限  从 0 开始，所以总长要 - 1
-	gdt_ptr.limit = sizeof(gdt_entry_t) * GDT_LENGTH - 1;
-	gdt_ptr.base = (uint32_t)&gdt_entries;
+	bool intr_flag = false;
+	local_intr_store(intr_flag);
+	{
+		// 全局描述符表界限  从 0 开始，所以总长要 - 1
+		gdt_ptr.limit = sizeof(gdt_entry_t) * GDT_LENGTH - 1;
+		gdt_ptr.base = (uint32_t)&gdt_entries;
 
-	// 采用 Intel 平坦模型
-	// 0xC0: 粒度为 4096?
-	gdt_set_gate(SEG_NULL, 0x0, 0x0, 0x0, 0x0);      // Intel 文档要求首个描述符全 0
-	gdt_set_gate(SEG_KTEXT, 0x0, 0xFFFFFFFF, KREAD_EXEC, 0xC0); // 内核指令段
-	gdt_set_gate(SEG_KDATA, 0x0, 0xFFFFFFFF, KREAD_WRITE, 0xC0); // 内核数据段
-	gdt_set_gate(SEG_UTEXT, 0x0, 0xFFFFFFFF, UREAD_EXEC, 0xC0); // 用户模式代码段
-	gdt_set_gate(SEG_UDATA, 0x0, 0xFFFFFFFF, UREAD_WRITE, 0xC0); // 用户模式数据段
-	tss_set_gate(SEG_TSS, KERNEL_DS, 0);
+		// 采用 Intel 平坦模型
+		// 0xC0: 粒度为 4096?
+		gdt_set_gate(SEG_NULL, 0x0, 0x0, 0x0, 0x0);      // Intel 文档要求首个描述符全 0
+		gdt_set_gate(SEG_KTEXT, 0x0, 0xFFFFFFFF, KREAD_EXEC, 0xC0); // 内核指令段
+		gdt_set_gate(SEG_KDATA, 0x0, 0xFFFFFFFF, KREAD_WRITE, 0xC0); // 内核数据段
+		gdt_set_gate(SEG_UTEXT, 0x0, 0xFFFFFFFF, UREAD_EXEC, 0xC0); // 用户模式代码段
+		gdt_set_gate(SEG_UDATA, 0x0, 0xFFFFFFFF, UREAD_WRITE, 0xC0); // 用户模式数据段
+		tss_set_gate(SEG_TSS, KERNEL_DS, 0);
 
-	// 加载全局描述符表地址到 GDTR 寄存器
-	gdt_load( (uint32_t)&gdt_ptr);
-	// 加载任务寄存器
-	tss_load();
+		// 加载全局描述符表地址到 GDTR 寄存器
+		gdt_load( (uint32_t)&gdt_ptr);
+		// 加载任务寄存器
+		tss_load();
 
-	printk_info("gdt_init\n");
-	cpu_sti();
+		printk_info("gdt_init\n");
+		local_intr_restore(intr_flag);
+	}
 	return;
 }
 

@@ -12,6 +12,7 @@ extern "C" {
 #include "debug.h"
 #include "../drv/8259A/include/8259A.h"
 #include "cpu.hpp"
+#include "sync.hpp"
 #include "include/intr.h"
 
 // 中断描述符表
@@ -108,45 +109,64 @@ static isr_irq_func_t isr_irq_func[INTERRUPT_MAX] = {
 
 // idt 初始化
 void intr_init(void) {
-	cpu_cli();
-	init_interrupt_chip();
-	idt_ptr.limit = sizeof(idt_entry_t) * INTERRUPT_MAX - 1;
-	idt_ptr.base = (uint32_t)&idt_entries;
+	bool intr_flag = false;
+	local_intr_store(intr_flag);
+	{
+		init_interrupt_chip();
+		idt_ptr.limit = sizeof(idt_entry_t) * INTERRUPT_MAX - 1;
+		idt_ptr.base = (uint32_t)&idt_entries;
 
-	// 0-32:  用于 CPU 的中断处理
-	// GD_KTEXT: 内核代码段
-	// 0x8E: 10001110: DPL=0s
-	// 0x08: 0000 1000
+		// 0-32:  用于 CPU 的中断处理
+		// GD_KTEXT: 内核代码段
+		// 0x8E: 10001110: DPL=0s
+		// 0x08: 0000 1000
 
-	for(uint32_t i = 0 ; i < 48 ; ++i) {
-		idt_set_gate(i, (uint32_t)isr_irq_func[i], 0x08, 0x8E);
+		for(uint32_t i = 0 ; i < 48 ; ++i) {
+			idt_set_gate(i, (uint32_t)isr_irq_func[i], 0x08, 0x8E);
+		}
+		// 128 (0x80) 将来用于实现系统调用
+		// 0xEF: 1110 1111, DPL=3
+		idt_set_gate(INT_DEBUG, (uint32_t)isr_irq_func[INT_DEBUG], 0x08, 0xEF);
+		idt_set_gate(INT_OVERFLOW, (uint32_t)isr_irq_func[INT_OVERFLOW], 0x08, 0xEF);
+		idt_set_gate(INT_BOUND, (uint32_t)isr_irq_func[INT_BOUND], 0x08, 0xEF);
+		idt_set_gate(128, (uint32_t)isr128, 0x08, 0xEF);
+
+		idt_load( (uint32_t)&idt_ptr);
+
+		register_interrupt_handler(INT_DIVIDE_ERROR, &divide_error);
+		register_interrupt_handler(INT_DEBUG, &debug);
+		register_interrupt_handler(INT_NMI, &nmi);
+		register_interrupt_handler(INT_BREAKPOINT, &breakpoint);
+		register_interrupt_handler(INT_OVERFLOW, &overflow);
+		register_interrupt_handler(INT_BOUND, &bound);
+		register_interrupt_handler(INT_INVALID_OPCODE, &invalid_opcode);
+		register_interrupt_handler(INT_DEVICE_NOT_AVAIL, &device_not_available);
+		register_interrupt_handler(INT_DOUBLE_FAULT, &double_fault);
+		register_interrupt_handler(INT_COPROCESSOR, &coprocessor_error);
+		register_interrupt_handler(INT_INVALID_TSS, &invalid_TSS);
+		register_interrupt_handler(INT_SEGMENT, &segment_not_present);
+		register_interrupt_handler(INT_STACK_FAULT, &stack_segment);
+		register_interrupt_handler(INT_GENERAL_PROTECT, &general_protection);
+
+		printk_info("intr_init\n");
 	}
-	// 128 (0x80) 将来用于实现系统调用
-	// 0xEF: 1110 1111, DPL=3
-	idt_set_gate(INT_DEBUG, (uint32_t)isr_irq_func[INT_DEBUG], 0x08, 0xEF);
-	idt_set_gate(INT_OVERFLOW, (uint32_t)isr_irq_func[INT_OVERFLOW], 0x08, 0xEF);
-	idt_set_gate(INT_BOUND, (uint32_t)isr_irq_func[INT_BOUND], 0x08, 0xEF);
-	idt_set_gate(128, (uint32_t)isr128, 0x08, 0xEF);
+	local_intr_restore(intr_flag);
+	return;
+}
 
-	idt_load( (uint32_t)&idt_ptr);
-
-	register_interrupt_handler(INT_DIVIDE_ERROR, &divide_error);
-	register_interrupt_handler(INT_DEBUG, &debug);
-	register_interrupt_handler(INT_NMI, &nmi);
-	register_interrupt_handler(INT_BREAKPOINT, &breakpoint);
-	register_interrupt_handler(INT_OVERFLOW, &overflow);
-	register_interrupt_handler(INT_BOUND, &bound);
-	register_interrupt_handler(INT_INVALID_OPCODE, &invalid_opcode);
-	register_interrupt_handler(INT_DEVICE_NOT_AVAIL, &device_not_available);
-	register_interrupt_handler(INT_DOUBLE_FAULT, &double_fault);
-	register_interrupt_handler(INT_COPROCESSOR, &coprocessor_error);
-	register_interrupt_handler(INT_INVALID_TSS, &invalid_TSS);
-	register_interrupt_handler(INT_SEGMENT, &segment_not_present);
-	register_interrupt_handler(INT_STACK_FAULT, &stack_segment);
-	register_interrupt_handler(INT_GENERAL_PROTECT, &general_protection);
-
-	printk_info("intr_init\n");
-	cpu_sti();
+// 输出 pt_regs 信息
+void show_pt_regs(pt_regs_t * pt_regs) {
+	printk("addr: 0x%08X - 0x%08X, size: 0x%08X\n", &pt_regs->gs, &pt_regs->user_ss);
+	printk("gs: 0x%08X\tfs: 0x%08X\tes: 0x%08X\tds: 0x%08X\n",
+	    pt_regs->gs, pt_regs->fs, pt_regs->es, pt_regs->ds);
+	printk("edi: 0x%08X\tesi: 0x%08X\tebp: 0x%08X\told_esp: 0x%08X\n",
+	    pt_regs->edi, pt_regs->esi, pt_regs->ebp, pt_regs->old_esp);
+	printk("ebx: 0x%08X\tedx: 0x%08X\tecx: 0x%08X\teax: 0x%08X\n",
+	    pt_regs->ebx, pt_regs->edx, pt_regs->ecx, pt_regs->eax);
+	printk("int_no: 0x%08X\terr_code: %08X\teip: 0x%08X\tcs: 0x%08X\n",
+	    pt_regs->int_no, pt_regs->err_code, pt_regs->eip, pt_regs->cs);
+	printk("eflags: 0x%08X\tuser_esp: 0x%08X\tss: 0x%08X\n",
+	    pt_regs->eflags, pt_regs->user_esp, pt_regs->user_ss);
 	return;
 }
 

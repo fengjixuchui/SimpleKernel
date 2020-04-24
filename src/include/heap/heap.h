@@ -25,8 +25,8 @@ typedef
 	const char *      name;
 	// 初始化
 	void (* heap_manage_init)(ptr_t addr_start);
-	// 申请物理内存，单位为 Byte
-	ptr_t (* heap_manage_malloc)(size_t bytes);
+	// 内存申请，单位为 Byte，align 为对齐大小
+	ptr_t (* heap_manage_malloc)(size_t byte);
 	// 释放内存
 	void (* heap_manage_free)(ptr_t addr);
 } heap_manage_t;
@@ -35,7 +35,7 @@ typedef
 void heap_init(void);
 
 // 内存申请，单位为 Byte
-ptr_t kmalloc(size_t len);
+ptr_t kmalloc(size_t byte);
 
 // 内存释放
 void kfree(ptr_t p);
